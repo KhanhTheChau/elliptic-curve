@@ -2,9 +2,9 @@ import tkinter as tk
 from tkinter import messagebox
 from collections import defaultdict
 import random
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
+import hashlib
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
 
 class ECC:
     def __init__(self, p=None):
@@ -12,7 +12,7 @@ class ECC:
         self.a, self.b = self.generate_a_b()
         self.points = self.find_points()
         self.G = random.choice(self.points)
-        self.d = random.randint(1, self.p - 1)
+        self.d = 5
         self.Q = self.scalar_multiply(self.d, self.G)
 
     def find_large_prime(self, start):
@@ -88,97 +88,61 @@ class ECC:
             k >>= 1
         return result
 
-    def encode_message(self, message):
-        all_points = self.points
-        point_map = defaultdict(list)
-        for x, y in all_points:
-            point_map[x].append((x, y))
 
-        points = []
-        offsets = []
-        for char in message:
-            base_x = ord(char)
-            for offset in range(100):
-                x_try = (base_x + offset) % self.p
-                if point_map[x_try]:
-                    points.append(point_map[x_try][0])
-                    offsets.append(offset)
-                    break
-            else:
-                raise ValueError(f"Không ánh xạ được ký tự: {char}")
-        return points, offsets
-
-    def decode_message(self, points, offsets):
-        message = ''
-        for (x, _), offset in zip(points, offsets):
-            char_code = (x - offset) % 256
-            message += chr(char_code)
-        return message
-
-    def encrypt_point(self, M):
-        while True:
-            k = random.randint(1, self.p - 1)
-            C1 = self.scalar_multiply(k, self.G)
-            if C1 is None:
-                continue  
-            kQ = self.scalar_multiply(k, self.Q)
-            C2 = self.point_add(M, kQ)
-            if C2 is None:
-                continue  
-            return C1, C2
-
-
-    def decrypt_point(self, C1, C2):
-        dC1 = self.scalar_multiply(self.d, C1)
-        neg_dC1 = (dC1[0], (-dC1[1]) % self.p)
-        return self.point_add(C2, neg_dC1)
-
+# Dùng AES kết hợp với khóa sinh từ ECC để mã hóa và giải mã
+    def generate_shared_secret(self, C1):
+        shared_point = self.scalar_multiply(self.d, C1)
+        shared_x = str(shared_point[0]).encode()
+        return hashlib.sha256(shared_x).digest()
 
 class ECCApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("ECC Encryption App")
+        self.root.title("ECC Hybrid AES Encryption (1 ô chuỗi)")
         self.ecc = ECC()
 
-        self.message_label = tk.Label(root, text="Nhập thông điệp:")
-        self.message_label.pack()
-        self.message_entry = tk.Entry(root, width=40)
+        tk.Label(root, text="Nhập bản rõ hoặc chuỗi đã mã hóa:").pack()
+        self.message_entry = tk.Entry(root, width=80)
         self.message_entry.pack()
 
-        self.encrypt_button = tk.Button(root, text="Mã hóa", command=self.encrypt)
-        self.encrypt_button.pack()
+        tk.Label(root, text="Văn bản đã mã hóa (dành để copy lại):").pack()
+        self.encrypted_entry = tk.Entry(root, width=80)
+        self.encrypted_entry.pack()
 
-        self.decrypt_button = tk.Button(root, text="Giải mã", command=self.decrypt)
-        self.decrypt_button.pack()
+        tk.Button(root, text="Mã hóa", command=self.encrypt).pack()
+        tk.Button(root, text="Giải mã", command=self.decrypt).pack()
 
-        self.output_text = tk.Text(root, height=10, width=60)
+        self.output_text = tk.Text(root, height=12, width=90)
         self.output_text.pack()
 
-        self.ciphertexts = []
-        self.offsets = []
+        self.fixed_iv = b"1234567890ABCDEF"
+        self.fixed_C1 = self.ecc.Q
 
     def encrypt(self):
         try:
             message = self.message_entry.get()
-            self.ecc = ECC()  
-            M_points, self.offsets = self.ecc.encode_message(message)
-            self.ciphertexts = [self.ecc.encrypt_point(M) for M in M_points]
+            aes_key = self.ecc.generate_shared_secret(self.fixed_C1)
+            cipher = AES.new(aes_key, AES.MODE_CBC, iv=self.fixed_iv)
+            padded = pad(message.encode(), AES.block_size)
+            ciphertext = cipher.encrypt(padded)
+            cipher_hex = ciphertext.hex()
+            self.encrypted_entry.delete(0, tk.END)
+            self.encrypted_entry.insert(0, cipher_hex)
             self.output_text.delete(1.0, tk.END)
-            self.output_text.insert(tk.END, f"Original: {message}\n")
-            self.output_text.insert(tk.END, f"Encrypted (C1, C2):\n")
-            for c1, c2 in self.ciphertexts:
-                self.output_text.insert(tk.END, f"{c1}, {c2}\n")
+            self.output_text.insert(tk.END, f"Đã mã hóa:\n{cipher_hex}\n")
         except Exception as e:
             messagebox.showerror("Lỗi", str(e))
 
     def decrypt(self):
         try:
-            decrypted = [self.ecc.decrypt_point(c1, c2) for c1, c2 in self.ciphertexts]
-            recovered = self.ecc.decode_message(decrypted, self.offsets)
-            self.output_text.insert(tk.END, f"\nGiải mã được: {recovered}\n")
+            cipher_hex = self.encrypted_entry.get()
+            ciphertext = bytes.fromhex(cipher_hex)
+            aes_key = self.ecc.generate_shared_secret(self.fixed_C1)
+            cipher = AES.new(aes_key, AES.MODE_CBC, iv=self.fixed_iv)
+            decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size).decode()
+            self.output_text.insert(tk.END, f"\nĐã giải mã:\n{decrypted}\n")
         except Exception as e:
             messagebox.showerror("Lỗi", str(e))
-
 
 if __name__ == "__main__":
     root = tk.Tk()
