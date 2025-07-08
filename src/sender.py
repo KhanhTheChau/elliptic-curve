@@ -2,7 +2,6 @@ import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import random
-from ECC import ECC
 
 class Sender:
     def __init__(self, ecc):

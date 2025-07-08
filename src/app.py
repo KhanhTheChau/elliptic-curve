@@ -8,7 +8,7 @@ from receiver import Receiver
 class ECCApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("ECC Encryption/Decryption")
+        self.root.title("ECC App")
         self.ecc = None
         self.private_key_created = False
 

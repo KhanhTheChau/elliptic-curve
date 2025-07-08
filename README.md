@@ -25,9 +25,9 @@ elliptic-curve/
 │
 ├── docs/ # Tài liệu lý thuyết, slide thuyết trình, báo cáo
 ├── src/ # Mã nguồn Python minh họa ECC
-│ ├── xxx.py 
-│ ├── main.py 
-│ └── xxx.py 
+│ ├── ECC.py 
+│ ├── app.py 
+│ └── ----.py 
 ├── requirements.txt # Các thư viện cần cài đặt
 └── README.md # Mô tả dự án
 

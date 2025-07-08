@@ -1,5 +1,0 @@
-hello                        8a5da511532e39f39fdb30df4a54892b
-Châu Thế Khanh               6a28c21b8040a562d4563e9561d705410cbf7860c844dd5f2442603f9c64f3ad
-Nguyễn Lê Tấn Thành          80b61833fafacfea7a8b4d3364e8cf0ef0e310d1170cb1cc4be7cdd991285c22
-Đường cong elliptic          66279c8ff143b81276bee37a2c820aed0b83514682fd8d468583fc9ad82037ee
-Việt Nam                     5bd16839965a01ae6861103411cace56
